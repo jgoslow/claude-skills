@@ -5,23 +5,20 @@ description: This skill should be used when the user asks to "check analytics", 
 
 ## Authentication
 
-- **Base URL**: `https://us.posthog.com`
-- **Project ID**: `124499`
-- **Auth header**: `Authorization: Bearer $POSTHOG_USER_READ_TOKEN`
-- **API key scope**: Read-only. POST requests to the Query API execute read queries only.
-
-Standard curl pattern for all requests:
+Define a `phog` helper function once at the start of the session. All subsequent commands use it.
 
 ```bash
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/ENDPOINT/" | jq '.'
+phog() { curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" -H "Content-Type: application/json" "$@"; }
 ```
 
-Verify token and project access:
+- **Base URL**: `https://us.posthog.com`
+- **Project ID**: `124499`
+- **API key scope**: Read-only. POST requests to the Query API execute read queries only.
+
+Verify access:
 
 ```bash
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/" | jq '{name, id}'
+phog "https://us.posthog.com/api/projects/124499/" | jq '{name, id}'
 ```
 
 ### Rate Limits
@@ -55,10 +52,7 @@ POST https://us.posthog.com/api/projects/124499/query/
 ### Page Views
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -70,10 +64,7 @@ curl -s -X POST \
 ### Count Events by Type
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -85,10 +76,7 @@ curl -s -X POST \
 ### Top Pages (Last 7 Days)
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -100,10 +88,7 @@ curl -s -X POST \
 ### Unique Users by Event
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -115,10 +100,7 @@ curl -s -X POST \
 ### Events with Property Filters
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -130,10 +112,7 @@ curl -s -X POST \
 ### Daily Event Counts
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -145,10 +124,7 @@ curl -s -X POST \
 ### Query Person Properties
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -160,10 +136,7 @@ curl -s -X POST \
 ### Users Who Performed a Specific Event
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -179,10 +152,7 @@ Structured trend queries with breakdowns and multiple series.
 ### Basic Trend (Daily Page Views, Last 30 Days)
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -196,10 +166,7 @@ curl -s -X POST \
 ### Trend with Breakdown by Browser
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -216,10 +183,7 @@ curl -s -X POST \
 ### Multiple Series (Compare Events)
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -245,10 +209,7 @@ curl -s -X POST \
 ### Multi-Step Funnel
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "FunnelsQuery",
@@ -269,10 +230,7 @@ curl -s -X POST \
 ### Funnel with Property Filter
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "FunnelsQuery",
@@ -295,10 +253,7 @@ curl -s -X POST \
 ### Retention Query
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "RetentionQuery",
@@ -316,10 +271,7 @@ curl -s -X POST \
 ### Paths Query (User Journeys)
 
 ```bash
-curl -s -X POST \
-  -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
   -d '{
     "query": {
       "kind": "PathsQuery",
@@ -336,20 +288,16 @@ curl -s -X POST \
 
 ```bash
 # List persons (paginated)
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/persons/?limit=100" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/persons/?limit=100" | jq '.results'
 
 # Search by email
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/persons/?search=user@example.com" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/persons/?search=user@example.com" | jq '.results'
 
 # Filter by distinct_id
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/persons/?distinct_id=user123" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/persons/?distinct_id=user123" | jq '.results'
 
 # Get a specific person by ID
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/persons/PERSON_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/persons/PERSON_ID/" | jq '.'
 ```
 
 Pagination: follow the `next` URL in the response to get subsequent pages.
@@ -358,63 +306,49 @@ Pagination: follow the `next` URL in the response to get subsequent pages.
 
 ```bash
 # List session recordings
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/session_recordings/?limit=20" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/session_recordings/?limit=20" | jq '.results'
 
 # View a specific recording
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/session_recordings/RECORDING_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/session_recordings/RECORDING_ID/" | jq '.'
 
 # List feature flags
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/feature_flags/" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/feature_flags/" | jq '.results'
 
 # View a specific flag
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/feature_flags/FLAG_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/feature_flags/FLAG_ID/" | jq '.'
 
 # List cohorts
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/cohorts/" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/cohorts/" | jq '.results'
 
 # View a specific cohort
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/cohorts/COHORT_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/cohorts/COHORT_ID/" | jq '.'
 ```
 
 ## REST Endpoints — Insights, Dashboards, Actions, Definitions
 
 ```bash
 # List saved insights
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/insights/?limit=50" | jq '.results[] | {id, name, short_id}'
+phog "https://us.posthog.com/api/projects/124499/insights/?limit=50" | jq '.results[] | {id, name, short_id}'
 
 # View a specific insight
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/insights/INSIGHT_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/insights/INSIGHT_ID/" | jq '.'
 
 # List dashboards
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/dashboards/" | jq '.results[] | {id, name}'
+phog "https://us.posthog.com/api/projects/124499/dashboards/" | jq '.results[] | {id, name}'
 
 # List actions
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/actions/" | jq '.results[] | {id, name}'
+phog "https://us.posthog.com/api/projects/124499/actions/" | jq '.results[] | {id, name}'
 
 # List event definitions (discover available events)
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/event_definitions/" | jq '.results[] | {name, volume_30_day}'
+phog "https://us.posthog.com/api/projects/124499/event_definitions/" | jq '.results[] | {name, volume_30_day}'
 
 # List property definitions (discover available properties)
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/property_definitions/" | jq '.results[] | {name, property_type}'
+phog "https://us.posthog.com/api/projects/124499/property_definitions/" | jq '.results[] | {name, property_type}'
 
 # List groups and group types
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/groups_types/" | jq '.'
+phog "https://us.posthog.com/api/projects/124499/groups_types/" | jq '.'
 
-curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" \
-  "https://us.posthog.com/api/projects/124499/groups/?group_type_index=0&limit=50" | jq '.results'
+phog "https://us.posthog.com/api/projects/124499/groups/?group_type_index=0&limit=50" | jq '.results'
 ```
 
 ## Troubleshooting
@@ -436,9 +370,8 @@ To enable fast, uninterrupted PostHog queries, add these permissions to the proj
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s -H *posthog.com*)",
-      "Bash(curl -s -X GET -H *posthog.com*)",
-      "Bash(curl -s -X POST -H *posthog.com*)"
+      "Bash(phog() *)",
+      "Bash(phog *)"
     ]
   }
 }
