@@ -227,6 +227,7 @@ gh release list -R LyraDesigns/lux-shopify-theme --json tagName,name,publishedAt
 Add these read-only permissions to `~/.claude/settings.json` (global, applies to all projects). All commands below are strictly read-only — no write operations are included.
 
 ```json
+"Bash(set -a && source *)",
 "Bash(export GH_TOKEN=*)",
 "Bash(gh auth status*)",
 "Bash(gh api *)",

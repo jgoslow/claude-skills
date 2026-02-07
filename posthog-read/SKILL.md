@@ -1,225 +1,148 @@
 ---
 name: posthog-read
-description: This skill should be used when the user asks to "check analytics", "query events", "view page views", "check funnels", "get user properties", "list cohorts", "view session recordings", "check feature flags", "run HogQL query", "get retention data", "view trends", or any read-only PostHog API operation. Requires POSTHOG_USER_READ_TOKEN.
+description: This skill should be used when the user asks to "check analytics", "query events", "view page views", "check funnels", "get user properties", "list cohorts", "view session recordings", "check feature flags", "run HogQL query", "get retention data", "view trends", or any read-only PostHog API operation. Uses the official PostHog plugin.
 ---
 
-## Authentication
+## PostHog Plugin
 
-Define a `phog` helper function once at the start of the session. All subsequent commands use it.
+All PostHog operations use the **official PostHog plugin** (`posthog@claude-plugins-official`). Auth is handled via OAuth — you authenticate once in the browser and the token persists across sessions.
 
-```bash
-set -a && source ~/.env 2>/dev/null; source .env 2>/dev/null; set +a
-phog() { curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" -H "Content-Type: application/json" "$@"; }
-PH_PROJECT=$POSTHOG_PROD_PROJECT_ID
-```
+Before running any PostHog queries, verify the plugin is connected by checking if PostHog tools (like `posthog:query`) are available. If they are not:
 
-After sourcing, check that `POSTHOG_USER_READ_TOKEN` is set. If it is empty or `.env` does not exist, **stop and tell the user**:
+1. **Plugin not installed** — tell the user: "The PostHog plugin isn't installed. Run `claude plugin install posthog` in your terminal, then restart Claude Code."
+2. **Plugin installed but tools not loading** — tell the user: "The PostHog plugin is installed but needs OAuth authentication. Run `/posthog:query` or restart Claude Code to trigger the browser login flow. You only need to do this once."
 
-> Your project is missing PostHog credentials. Add these to a `.env` file in your project root:
+## Projects
+
+When the user mentions an environment, use the corresponding project:
+
+| Environment | Project ID env var |
+|---|---|
+| **Production** (default) | `$POSTHOG_PROD_PROJECT_ID` |
+| **Staging** | `$POSTHOG_STAGE_PROJECT_ID` |
+| **Development** | `$POSTHOG_DEV_PROJECT_ID` |
+
+Project IDs are stored in the project's `.env` file. If missing, tell the user:
+
+> Add PostHog project IDs to your `.env`:
 >
 > ```
-> POSTHOG_USER_READ_TOKEN=phx_your_token_here
 > POSTHOG_PROD_PROJECT_ID=your_prod_id
 > POSTHOG_STAGE_PROJECT_ID=your_stage_id
 > POSTHOG_DEV_PROJECT_ID=your_dev_id
 > ```
 >
-> Get your personal API key from **PostHog > Settings > Personal API Keys**. Create a key with read-only scopes. Project IDs are in each project's URL: `https://us.posthog.com/project/<ID>/`.
+> Find project IDs in the URL: `https://us.posthog.com/project/<ID>/`
 
-Do not proceed with any API calls until the token is confirmed set.
+## HogQL Query Patterns
 
-- **Base URL**: `https://us.posthog.com`
-- **Default project**: Production (`$POSTHOG_PROD_PROJECT_ID`)
-- **API key scope**: Read-only. POST requests to the Query API execute read queries only.
-
-If the user says they're working in staging or dev, re-set the project:
-
-```bash
-PH_PROJECT=$POSTHOG_STAGE_PROJECT_ID  # Staging
-PH_PROJECT=$POSTHOG_DEV_PROJECT_ID    # Development
-```
-
-Verify access:
-
-```bash
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/" | jq '{name, id}'
-```
-
-### Rate Limits
-
-| Endpoint type | Limit |
-|---|---|
-| Analytics (insights, persons, recordings) | 240/min, 1200/hr |
-| Query API (`/query/`) | 2400/hr |
-| CRUD endpoints | 480/min, 4800/hr |
-
-Limits are per-organization, not per-key.
-
-## Performance Rules
-
-1. **Use HogQL for analytics** — most powerful and flexible; one query replaces many REST calls
-2. **Use REST endpoints for listing resources** — persons, flags, cohorts, recordings
-3. **Always add `LIMIT`** to HogQL queries — avoid huge payloads
-4. **Use timestamp-based pagination** for large datasets (not OFFSET)
-5. **Pipe through `jq`** for client-side filtering
-6. **Run independent queries in parallel** with `&` + `wait`
-7. **Queries are cached** by default — repeated calls are fast
-
-## Query API — HogQL
-
-The Query API is the primary tool for analytics. All queries POST to:
-
-```
-POST https://us.posthog.com/api/projects/$PH_PROJECT/query/
-```
+Use the plugin's query tool with HogQL for flexible analytics. Always add `LIMIT` to avoid huge payloads.
 
 ### Page Views
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT timestamp, properties.$current_url, properties.$browser, properties.$os FROM events WHERE event = '"'"'$pageview'"'"' ORDER BY timestamp DESC LIMIT 100"
-    }
-  }' | jq '.results'
+```sql
+SELECT timestamp, properties.$current_url, properties.$browser, properties.$os
+FROM events WHERE event = '$pageview'
+ORDER BY timestamp DESC LIMIT 100
 ```
 
 ### Count Events by Type
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT event, count() as count FROM events WHERE timestamp > now() - INTERVAL 7 DAY GROUP BY event ORDER BY count DESC LIMIT 50"
-    }
-  }' | jq '.results'
+```sql
+SELECT event, count() as count
+FROM events WHERE timestamp > now() - INTERVAL 7 DAY
+GROUP BY event ORDER BY count DESC LIMIT 50
 ```
 
 ### Top Pages (Last 7 Days)
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT properties.$current_url as url, count() as views, count(DISTINCT distinct_id) as unique_users FROM events WHERE event = '"'"'$pageview'"'"' AND timestamp > now() - INTERVAL 7 DAY GROUP BY url ORDER BY views DESC LIMIT 25"
-    }
-  }' | jq '.results'
+```sql
+SELECT properties.$current_url as url, count() as views, count(DISTINCT distinct_id) as unique_users
+FROM events WHERE event = '$pageview' AND timestamp > now() - INTERVAL 7 DAY
+GROUP BY url ORDER BY views DESC LIMIT 25
 ```
 
 ### Unique Users by Event
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT count(DISTINCT distinct_id) as unique_users FROM events WHERE event = '"'"'$pageview'"'"' AND timestamp > now() - INTERVAL 30 DAY"
-    }
-  }' | jq '.results'
+```sql
+SELECT count(DISTINCT distinct_id) as unique_users
+FROM events WHERE event = '$pageview' AND timestamp > now() - INTERVAL 30 DAY
 ```
 
 ### Events with Property Filters
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT timestamp, distinct_id, properties.$current_url FROM events WHERE event = '"'"'$pageview'"'"' AND properties.$browser = '"'"'Chrome'"'"' AND timestamp > now() - INTERVAL 1 DAY LIMIT 50"
-    }
-  }' | jq '.results'
+```sql
+SELECT timestamp, distinct_id, properties.$current_url
+FROM events WHERE event = '$pageview' AND properties.$browser = 'Chrome'
+AND timestamp > now() - INTERVAL 1 DAY LIMIT 50
 ```
 
 ### Daily Event Counts
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT toDate(timestamp) as day, count() as events FROM events WHERE event = '"'"'$pageview'"'"' AND timestamp > now() - INTERVAL 30 DAY GROUP BY day ORDER BY day"
-    }
-  }' | jq '.results'
+```sql
+SELECT toDate(timestamp) as day, count() as events
+FROM events WHERE event = '$pageview' AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY day ORDER BY day
 ```
 
 ### Query Person Properties
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT distinct_id, person.properties.email, person.properties.$initial_browser, count() as event_count FROM events WHERE timestamp > now() - INTERVAL 7 DAY GROUP BY distinct_id, person.properties.email, person.properties.$initial_browser ORDER BY event_count DESC LIMIT 50"
-    }
-  }' | jq '.results'
+```sql
+SELECT distinct_id, person.properties.email, person.properties.$initial_browser, count() as event_count
+FROM events WHERE timestamp > now() - INTERVAL 7 DAY
+GROUP BY distinct_id, person.properties.email, person.properties.$initial_browser
+ORDER BY event_count DESC LIMIT 50
 ```
 
 ### Users Who Performed a Specific Event
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "HogQLQuery",
-      "query": "SELECT DISTINCT distinct_id, person.properties.email FROM events WHERE event = '"'"'purchase'"'"' AND timestamp > now() - INTERVAL 30 DAY LIMIT 100"
-    }
-  }' | jq '.results'
+```sql
+SELECT DISTINCT distinct_id, person.properties.email
+FROM events WHERE event = 'purchase' AND timestamp > now() - INTERVAL 30 DAY LIMIT 100
 ```
 
-## Query API — TrendsQuery
+## TrendsQuery Patterns
 
 Structured trend queries with breakdowns and multiple series.
 
-### Basic Trend (Daily Page Views, Last 30 Days)
+### Basic Trend
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "TrendsQuery",
-      "series": [{"event": "$pageview"}],
-      "dateRange": {"date_from": "-30d"},
-      "interval": "day"
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "TrendsQuery",
+  "series": [{"event": "$pageview"}],
+  "dateRange": {"date_from": "-30d"},
+  "interval": "day"
+}
 ```
 
-### Trend with Breakdown by Browser
+### Trend with Breakdown
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "TrendsQuery",
-      "series": [{"event": "$pageview"}],
-      "dateRange": {"date_from": "-7d"},
-      "interval": "day",
-      "breakdownFilter": {
-        "breakdowns": [{"property": "$browser", "type": "event"}]
-      }
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "TrendsQuery",
+  "series": [{"event": "$pageview"}],
+  "dateRange": {"date_from": "-7d"},
+  "interval": "day",
+  "breakdownFilter": {
+    "breakdowns": [{"property": "$browser", "type": "event"}]
+  }
+}
 ```
 
 ### Multiple Series (Compare Events)
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "TrendsQuery",
-      "series": [
-        {"event": "$pageview"},
-        {"event": "sign_up"},
-        {"event": "purchase"}
-      ],
-      "dateRange": {"date_from": "-30d"},
-      "interval": "week"
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "TrendsQuery",
+  "series": [
+    {"event": "$pageview"},
+    {"event": "sign_up"},
+    {"event": "purchase"}
+  ],
+  "dateRange": {"date_from": "-30d"},
+  "interval": "week"
+}
 ```
 
 ### Date Range Patterns
@@ -228,176 +151,112 @@ phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
 - Absolute: `"2025-01-01"` to `"2025-01-31"`
 - Intervals: `"hour"`, `"day"`, `"week"`, `"month"`
 
-## Query API — FunnelsQuery
+## FunnelsQuery Patterns
 
 ### Multi-Step Funnel
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "FunnelsQuery",
-      "series": [
-        {"event": "$pageview"},
-        {"event": "sign_up"},
-        {"event": "purchase"}
-      ],
-      "dateRange": {"date_from": "-30d"},
-      "funnelsFilter": {
-        "funnelWindowInterval": 14,
-        "funnelWindowIntervalUnit": "day"
-      }
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "FunnelsQuery",
+  "series": [
+    {"event": "$pageview"},
+    {"event": "sign_up"},
+    {"event": "purchase"}
+  ],
+  "dateRange": {"date_from": "-30d"},
+  "funnelsFilter": {
+    "funnelWindowInterval": 14,
+    "funnelWindowIntervalUnit": "day"
+  }
+}
 ```
 
 ### Funnel with Property Filter
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "FunnelsQuery",
-      "series": [
-        {"event": "viewed_product"},
-        {"event": "added_to_cart"},
-        {"event": "checkout_completed"}
-      ],
-      "dateRange": {"date_from": "-7d"},
-      "properties": {
-        "type": "AND",
-        "values": [{"type": "event", "key": "$browser", "value": "Chrome", "operator": "exact"}]
-      }
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "FunnelsQuery",
+  "series": [
+    {"event": "viewed_product"},
+    {"event": "added_to_cart"},
+    {"event": "checkout_completed"}
+  ],
+  "dateRange": {"date_from": "-7d"},
+  "properties": {
+    "type": "AND",
+    "values": [{"type": "event", "key": "$browser", "value": "Chrome", "operator": "exact"}]
+  }
+}
 ```
 
-## Query API — Retention & Paths
+## RetentionQuery Patterns
 
-### Retention Query
-
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "RetentionQuery",
-      "retentionFilter": {
-        "targetEntity": {"id": "$pageview", "type": "events"},
-        "returningEntity": {"id": "$pageview", "type": "events"},
-        "period": "Week",
-        "totalIntervals": 8
-      },
-      "dateRange": {"date_from": "-8w"}
-    }
-  }' | jq '.results'
+```json
+{
+  "kind": "RetentionQuery",
+  "retentionFilter": {
+    "targetEntity": {"id": "$pageview", "type": "events"},
+    "returningEntity": {"id": "$pageview", "type": "events"},
+    "period": "Week",
+    "totalIntervals": 8
+  },
+  "dateRange": {"date_from": "-8w"}
+}
 ```
 
-### Paths Query (User Journeys)
+## PathsQuery Patterns
 
-```bash
-phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
-  -d '{
-    "query": {
-      "kind": "PathsQuery",
-      "dateRange": {"date_from": "-7d"},
-      "pathsFilter": {
-        "includeEventTypes": ["$pageview"],
-        "stepLimit": 5
-      }
-    }
-  }' | jq '.results'
-```
-
-## REST Endpoints — Persons
-
-```bash
-# List persons (paginated)
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?limit=100" | jq '.results'
-
-# Search by email
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?search=user@example.com" | jq '.results'
-
-# Filter by distinct_id
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?distinct_id=user123" | jq '.results'
-
-# Get a specific person by ID
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/PERSON_ID/" | jq '.'
-```
-
-Pagination: follow the `next` URL in the response to get subsequent pages.
-
-## REST Endpoints — Session Recordings, Feature Flags, Cohorts
-
-```bash
-# List session recordings
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/session_recordings/?limit=20" | jq '.results'
-
-# View a specific recording
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/session_recordings/RECORDING_ID/" | jq '.'
-
-# List feature flags
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/feature_flags/" | jq '.results'
-
-# View a specific flag
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/feature_flags/FLAG_ID/" | jq '.'
-
-# List cohorts
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/cohorts/" | jq '.results'
-
-# View a specific cohort
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/cohorts/COHORT_ID/" | jq '.'
-```
-
-## REST Endpoints — Insights, Dashboards, Actions, Definitions
-
-```bash
-# List saved insights
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/insights/?limit=50" | jq '.results[] | {id, name, short_id}'
-
-# View a specific insight
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/insights/INSIGHT_ID/" | jq '.'
-
-# List dashboards
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/dashboards/" | jq '.results[] | {id, name}'
-
-# List actions
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/actions/" | jq '.results[] | {id, name}'
-
-# List event definitions (discover available events)
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/event_definitions/" | jq '.results[] | {name, volume_30_day}'
-
-# List property definitions (discover available properties)
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/property_definitions/" | jq '.results[] | {name, property_type}'
-
-# List groups and group types
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/groups_types/" | jq '.'
-
-phog "https://us.posthog.com/api/projects/$PH_PROJECT/groups/?group_type_index=0&limit=50" | jq '.results'
+```json
+{
+  "kind": "PathsQuery",
+  "dateRange": {"date_from": "-7d"},
+  "pathsFilter": {
+    "includeEventTypes": ["$pageview"],
+    "stepLimit": 5
+  }
+}
 ```
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| Auth failure (401) | Verify `POSTHOG_USER_READ_TOKEN` is set and starts with `phx_` |
-| 403 Forbidden | Key lacks required scope — check key scopes in PostHog settings |
-| Rate limited (429) | Wait and retry; check org-wide usage |
-| Empty results | Verify `$PH_PROJECT` is set correctly, check date range, try broader filters |
-| Stats 202 response | PostHog is computing — retry after a few seconds |
-| Pagination | Follow the `next` URL in the response body |
+| Plugin not connected | Run `claude plugin install posthog` and complete OAuth |
+| Wrong project | Check which project ID env var is being used |
+| Empty results | Widen date range, check event names with an event count query first |
+| Rate limited (429) | Wait and retry; limits are per-org (240/min analytics, 2400/hr queries) |
 
 ## Recommended Auto-Allow Settings
 
-Add this permission to `~/.claude/settings.json` (global, applies to all projects). The API key is scoped to read-only, so all commands are safe. The `phog()` function definition requires one-time manual approval per session.
+Add these read-only PostHog plugin permissions to `~/.claude/settings.json` (global, applies to all projects). All tools below are strictly read-only — write operations (create, update, delete) are excluded and will still require manual approval.
 
 ```json
-"Bash(phog *)"
+"mcp__plugin_posthog_posthog__query-run",
+"mcp__plugin_posthog_posthog__query-generate-hogql-from-question",
+"mcp__plugin_posthog_posthog__insight-get",
+"mcp__plugin_posthog_posthog__insight-query",
+"mcp__plugin_posthog_posthog__insights-get-all",
+"mcp__plugin_posthog_posthog__dashboard-get",
+"mcp__plugin_posthog_posthog__dashboards-get-all",
+"mcp__plugin_posthog_posthog__feature-flag-get-all",
+"mcp__plugin_posthog_posthog__feature-flag-get-definition",
+"mcp__plugin_posthog_posthog__experiment-get",
+"mcp__plugin_posthog_posthog__experiment-get-all",
+"mcp__plugin_posthog_posthog__experiment-results-get",
+"mcp__plugin_posthog_posthog__error-details",
+"mcp__plugin_posthog_posthog__list-errors",
+"mcp__plugin_posthog_posthog__docs-search",
+"mcp__plugin_posthog_posthog__organization-details-get",
+"mcp__plugin_posthog_posthog__organizations-get",
+"mcp__plugin_posthog_posthog__projects-get",
+"mcp__plugin_posthog_posthog__survey-get",
+"mcp__plugin_posthog_posthog__surveys-get-all",
+"mcp__plugin_posthog_posthog__surveys-global-stats",
+"mcp__plugin_posthog_posthog__survey-stats",
+"mcp__plugin_posthog_posthog__logs-query",
+"mcp__plugin_posthog_posthog__logs-list-attributes",
+"mcp__plugin_posthog_posthog__logs-list-attribute-values",
+"mcp__plugin_posthog_posthog__entity-search"
 ```
 
-Add this to the `permissions.allow` array in settings.json.
-
-### Available Tokens
-* `POSTHOG_USER_READ_TOKEN`
-* `POSTHOG_PROD_PROJECT_ID`
-* `POSTHOG_STAGE_PROJECT_ID`
-* `POSTHOG_DEV_PROJECT_ID`
+Add these to the `permissions.allow` array in settings.json.
