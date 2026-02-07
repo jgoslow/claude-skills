@@ -8,8 +8,21 @@ description: This skill should be used when the user asks to "list repos", "chec
 Export `GH_TOKEN` once at the start of the session. All subsequent `gh` commands authenticate automatically.
 
 ```bash
+set -a && source ~/.env 2>/dev/null; source .env 2>/dev/null; set +a
 export GH_TOKEN=$GITHUB_USER_READ_TOKEN
 ```
+
+After sourcing, check that `GITHUB_USER_READ_TOKEN` is set. If it is empty, **stop and tell the user**:
+
+> Your GitHub token is missing. Add this to `~/.env` (global) or your project's `.env` (project-specific):
+>
+> ```
+> GITHUB_USER_READ_TOKEN=ghp_your_token_here
+> ```
+>
+> Create a personal access token at **GitHub > Settings > Developer settings > Personal access tokens**. Grant `repo` and `read:org` scopes.
+
+Do not proceed with any API calls until the token is confirmed set.
 
 Verify access:
 

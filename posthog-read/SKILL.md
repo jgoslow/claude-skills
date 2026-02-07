@@ -8,17 +8,41 @@ description: This skill should be used when the user asks to "check analytics", 
 Define a `phog` helper function once at the start of the session. All subsequent commands use it.
 
 ```bash
+set -a && source ~/.env 2>/dev/null; source .env 2>/dev/null; set +a
 phog() { curl -s -H "Authorization: Bearer $POSTHOG_USER_READ_TOKEN" -H "Content-Type: application/json" "$@"; }
+PH_PROJECT=$POSTHOG_PROD_PROJECT_ID
 ```
 
+After sourcing, check that `POSTHOG_USER_READ_TOKEN` is set. If it is empty or `.env` does not exist, **stop and tell the user**:
+
+> Your project is missing PostHog credentials. Add these to a `.env` file in your project root:
+>
+> ```
+> POSTHOG_USER_READ_TOKEN=phx_your_token_here
+> POSTHOG_PROD_PROJECT_ID=your_prod_id
+> POSTHOG_STAGE_PROJECT_ID=your_stage_id
+> POSTHOG_DEV_PROJECT_ID=your_dev_id
+> ```
+>
+> Get your personal API key from **PostHog > Settings > Personal API Keys**. Create a key with read-only scopes. Project IDs are in each project's URL: `https://us.posthog.com/project/<ID>/`.
+
+Do not proceed with any API calls until the token is confirmed set.
+
 - **Base URL**: `https://us.posthog.com`
-- **Project ID**: `124499`
+- **Default project**: Production (`$POSTHOG_PROD_PROJECT_ID`)
 - **API key scope**: Read-only. POST requests to the Query API execute read queries only.
+
+If the user says they're working in staging or dev, re-set the project:
+
+```bash
+PH_PROJECT=$POSTHOG_STAGE_PROJECT_ID  # Staging
+PH_PROJECT=$POSTHOG_DEV_PROJECT_ID    # Development
+```
 
 Verify access:
 
 ```bash
-phog "https://us.posthog.com/api/projects/124499/" | jq '{name, id}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/" | jq '{name, id}'
 ```
 
 ### Rate Limits
@@ -46,13 +70,13 @@ Limits are per-organization, not per-key.
 The Query API is the primary tool for analytics. All queries POST to:
 
 ```
-POST https://us.posthog.com/api/projects/124499/query/
+POST https://us.posthog.com/api/projects/$PH_PROJECT/query/
 ```
 
 ### Page Views
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -64,7 +88,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Count Events by Type
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -76,7 +100,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Top Pages (Last 7 Days)
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -88,7 +112,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Unique Users by Event
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -100,7 +124,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Events with Property Filters
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -112,7 +136,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Daily Event Counts
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -124,7 +148,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Query Person Properties
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -136,7 +160,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Users Who Performed a Specific Event
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "HogQLQuery",
@@ -152,7 +176,7 @@ Structured trend queries with breakdowns and multiple series.
 ### Basic Trend (Daily Page Views, Last 30 Days)
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -166,7 +190,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Trend with Breakdown by Browser
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -183,7 +207,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Multiple Series (Compare Events)
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "TrendsQuery",
@@ -209,7 +233,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Multi-Step Funnel
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "FunnelsQuery",
@@ -230,7 +254,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Funnel with Property Filter
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "FunnelsQuery",
@@ -253,7 +277,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Retention Query
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "RetentionQuery",
@@ -271,7 +295,7 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 ### Paths Query (User Journeys)
 
 ```bash
-phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
+phog -X POST "https://us.posthog.com/api/projects/$PH_PROJECT/query/" \
   -d '{
     "query": {
       "kind": "PathsQuery",
@@ -288,16 +312,16 @@ phog -X POST "https://us.posthog.com/api/projects/124499/query/" \
 
 ```bash
 # List persons (paginated)
-phog "https://us.posthog.com/api/projects/124499/persons/?limit=100" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?limit=100" | jq '.results'
 
 # Search by email
-phog "https://us.posthog.com/api/projects/124499/persons/?search=user@example.com" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?search=user@example.com" | jq '.results'
 
 # Filter by distinct_id
-phog "https://us.posthog.com/api/projects/124499/persons/?distinct_id=user123" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/?distinct_id=user123" | jq '.results'
 
 # Get a specific person by ID
-phog "https://us.posthog.com/api/projects/124499/persons/PERSON_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/persons/PERSON_ID/" | jq '.'
 ```
 
 Pagination: follow the `next` URL in the response to get subsequent pages.
@@ -306,49 +330,49 @@ Pagination: follow the `next` URL in the response to get subsequent pages.
 
 ```bash
 # List session recordings
-phog "https://us.posthog.com/api/projects/124499/session_recordings/?limit=20" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/session_recordings/?limit=20" | jq '.results'
 
 # View a specific recording
-phog "https://us.posthog.com/api/projects/124499/session_recordings/RECORDING_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/session_recordings/RECORDING_ID/" | jq '.'
 
 # List feature flags
-phog "https://us.posthog.com/api/projects/124499/feature_flags/" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/feature_flags/" | jq '.results'
 
 # View a specific flag
-phog "https://us.posthog.com/api/projects/124499/feature_flags/FLAG_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/feature_flags/FLAG_ID/" | jq '.'
 
 # List cohorts
-phog "https://us.posthog.com/api/projects/124499/cohorts/" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/cohorts/" | jq '.results'
 
 # View a specific cohort
-phog "https://us.posthog.com/api/projects/124499/cohorts/COHORT_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/cohorts/COHORT_ID/" | jq '.'
 ```
 
 ## REST Endpoints — Insights, Dashboards, Actions, Definitions
 
 ```bash
 # List saved insights
-phog "https://us.posthog.com/api/projects/124499/insights/?limit=50" | jq '.results[] | {id, name, short_id}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/insights/?limit=50" | jq '.results[] | {id, name, short_id}'
 
 # View a specific insight
-phog "https://us.posthog.com/api/projects/124499/insights/INSIGHT_ID/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/insights/INSIGHT_ID/" | jq '.'
 
 # List dashboards
-phog "https://us.posthog.com/api/projects/124499/dashboards/" | jq '.results[] | {id, name}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/dashboards/" | jq '.results[] | {id, name}'
 
 # List actions
-phog "https://us.posthog.com/api/projects/124499/actions/" | jq '.results[] | {id, name}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/actions/" | jq '.results[] | {id, name}'
 
 # List event definitions (discover available events)
-phog "https://us.posthog.com/api/projects/124499/event_definitions/" | jq '.results[] | {name, volume_30_day}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/event_definitions/" | jq '.results[] | {name, volume_30_day}'
 
 # List property definitions (discover available properties)
-phog "https://us.posthog.com/api/projects/124499/property_definitions/" | jq '.results[] | {name, property_type}'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/property_definitions/" | jq '.results[] | {name, property_type}'
 
 # List groups and group types
-phog "https://us.posthog.com/api/projects/124499/groups_types/" | jq '.'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/groups_types/" | jq '.'
 
-phog "https://us.posthog.com/api/projects/124499/groups/?group_type_index=0&limit=50" | jq '.results'
+phog "https://us.posthog.com/api/projects/$PH_PROJECT/groups/?group_type_index=0&limit=50" | jq '.results'
 ```
 
 ## Troubleshooting
@@ -358,7 +382,7 @@ phog "https://us.posthog.com/api/projects/124499/groups/?group_type_index=0&limi
 | Auth failure (401) | Verify `POSTHOG_USER_READ_TOKEN` is set and starts with `phx_` |
 | 403 Forbidden | Key lacks required scope — check key scopes in PostHog settings |
 | Rate limited (429) | Wait and retry; check org-wide usage |
-| Empty results | Verify project ID `124499`, check date range, try broader filters |
+| Empty results | Verify `$PH_PROJECT` is set correctly, check date range, try broader filters |
 | Stats 202 response | PostHog is computing — retry after a few seconds |
 | Pagination | Follow the `next` URL in the response body |
 
@@ -374,3 +398,6 @@ Add this to the `permissions.allow` array in settings.json.
 
 ### Available Tokens
 * `POSTHOG_USER_READ_TOKEN`
+* `POSTHOG_PROD_PROJECT_ID`
+* `POSTHOG_STAGE_PROJECT_ID`
+* `POSTHOG_DEV_PROJECT_ID`
