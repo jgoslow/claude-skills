@@ -211,38 +211,32 @@ gh release list -R LyraDesigns/lux-shopify-theme --json tagName,name,publishedAt
 
 ## Recommended Auto-Allow Settings
 
-To enable fast, uninterrupted GitHub queries, add these read-only permissions to the project's `.claude/settings.local.json`. All commands below are strictly read-only — no write operations are included.
+Add these read-only permissions to `~/.claude/settings.json` (global, applies to all projects). All commands below are strictly read-only — no write operations are included.
 
 ```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(export GH_TOKEN=*)",
-      "Bash(gh auth status*)",
-      "Bash(gh api:*)",
-      "Bash(gh repo list:*)",
-      "Bash(gh repo view:*)",
-      "Bash(gh pr list:*)",
-      "Bash(gh pr view:*)",
-      "Bash(gh pr diff:*)",
-      "Bash(gh pr checks:*)",
-      "Bash(gh search repos:*)",
-      "Bash(gh search prs:*)",
-      "Bash(gh search issues:*)",
-      "Bash(gh search code:*)",
-      "Bash(gh search commits:*)",
-      "Bash(gh issue list:*)",
-      "Bash(gh issue view:*)",
-      "Bash(gh run list:*)",
-      "Bash(gh run view:*)",
-      "Bash(gh release list:*)",
-      "Bash(gh release view:*)"
-    ]
-  }
-}
+"Bash(export GH_TOKEN=*)",
+"Bash(gh auth status*)",
+"Bash(gh api *)",
+"Bash(gh repo list *)",
+"Bash(gh repo view *)",
+"Bash(gh pr list *)",
+"Bash(gh pr view *)",
+"Bash(gh pr diff *)",
+"Bash(gh pr checks *)",
+"Bash(gh search repos *)",
+"Bash(gh search prs *)",
+"Bash(gh search issues *)",
+"Bash(gh search code *)",
+"Bash(gh search commits *)",
+"Bash(gh issue list *)",
+"Bash(gh issue view *)",
+"Bash(gh run list *)",
+"Bash(gh run view *)",
+"Bash(gh release list *)",
+"Bash(gh release view *)"
 ```
 
-Excluded write operations: `create`, `merge`, `close`, `edit`, `delete`, `fork`, `comment`, `review`.
+Add these to the `permissions.allow` array in settings.json. Excluded write operations: `create`, `merge`, `close`, `edit`, `delete`, `fork`, `comment`, `review`.
 
 ### Available Tokens
 * `GITHUB_USER_READ_TOKEN`

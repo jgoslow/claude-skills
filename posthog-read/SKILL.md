@@ -364,18 +364,13 @@ phog "https://us.posthog.com/api/projects/124499/groups/?group_type_index=0&limi
 
 ## Recommended Auto-Allow Settings
 
-To enable fast, uninterrupted PostHog queries, add these permissions to the project's `.claude/settings.local.json`. The API key is scoped to read-only, so all commands are safe.
+Add this permission to `~/.claude/settings.json` (global, applies to all projects). The API key is scoped to read-only, so all commands are safe. The `phog()` function definition requires one-time manual approval per session.
 
 ```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(phog() *)",
-      "Bash(phog *)"
-    ]
-  }
-}
+"Bash(phog *)"
 ```
+
+Add this to the `permissions.allow` array in settings.json.
 
 ### Available Tokens
 * `POSTHOG_USER_READ_TOKEN`
