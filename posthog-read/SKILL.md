@@ -1,42 +1,42 @@
 ---
 name: posthog-read
-description: This skill should be used when the user asks to "check analytics", "query events", "view page views", "check funnels", "get user properties", "list cohorts", "view session recordings", "check feature flags", "run HogQL query", "get retention data", "view trends", or any read-only PostHog API operation. Uses the official PostHog plugin.
+description: This skill should be used when the user mentions "posthog" or asks to "check analytics", "query events", "view page views", "list top pages", "check funnels", "get user properties", "list cohorts", "view session recordings", "check feature flags", "run HogQL query", "get retention data", "view trends", "check errors", "list projects", or any read-only PostHog API operation. Uses the PostHog MCP server.
 ---
 
-## PostHog Plugin
+## PostHog MCP Server
 
-All PostHog operations use the **official PostHog plugin** (`posthog@claude-plugins-official`). Auth is handled via OAuth — you authenticate once in the browser and the token persists across sessions.
+All PostHog operations use the **PostHog MCP server** (`https://mcp.posthog.com/mcp`) registered manually at user scope. Auth is handled via OAuth — you authenticate once in the browser and the token persists across sessions.
 
-Before running any PostHog queries, verify the plugin is connected by checking if PostHog tools (like `posthog:query`) are available. If they are not:
+> **Note (Feb 2026):** We use manual MCP registration instead of the official PostHog Claude Code plugin (`posthog@claude-plugins-official`). The plugin was buggy and untested when this skill was set up — its nested MCP server failed to load due to an incorrect `.mcp.json` format and likely lack of HTTP MCP support in the plugin system. Manual registration works reliably across both terminal and VSCode sessions.
 
-1. **Plugin not installed** — tell the user: "The PostHog plugin isn't installed. Run `claude plugin install posthog` in your terminal, then restart Claude Code."
-2. **Plugin installed but tools not loading** — tell the user: "The PostHog plugin is installed but needs OAuth authentication. Run `/posthog:query` or restart Claude Code to trigger the browser login flow. You only need to do this once."
+Before running any PostHog queries, verify the MCP is connected by checking if PostHog tools (like `mcp__posthog__query-run`) are available. If they are not:
+
+1. **MCP not registered** — tell the user: "The PostHog MCP server isn't registered. Run this in your terminal, then restart Claude Code:"
+
+   ```bash
+   claude mcp add --transport http posthog https://mcp.posthog.com/mcp -s user
+   ```
+
+   This registers the MCP at user scope so it's available in all projects (terminal and VSCode).
+
+2. **MCP registered but tools not loading** — tell the user: "The PostHog MCP is registered but needs OAuth authentication. Restart Claude Code to trigger the browser login flow. You only need to do this once."
 
 ## Projects
 
-When the user mentions an environment, use the corresponding project:
+On the **first PostHog query in a session**, determine which project to use:
 
-| Environment | Project ID env var |
-|---|---|
-| **Production** (default) | `$POSTHOG_PROD_PROJECT_ID` |
-| **Staging** | `$POSTHOG_STAGE_PROJECT_ID` |
-| **Development** | `$POSTHOG_DEV_PROJECT_ID` |
+1. **Call `projects-get`** to list available projects and their IDs
+2. **Auto-infer from context** — check the current working directory name, git remote, or repo name for hints:
+   - Contains "stage" or "staging" → use the Staging project
+   - Contains "prod" → use the Production project
+3. **If ambiguous** — ask the user which project to use for this session
+4. **Remember the choice** — use the same project for the rest of the session without re-asking
 
-Project IDs are stored in the project's `.env` file. If missing, tell the user:
-
-> Add PostHog project IDs to your `.env`:
->
-> ```
-> POSTHOG_PROD_PROJECT_ID=your_prod_id
-> POSTHOG_STAGE_PROJECT_ID=your_stage_id
-> POSTHOG_DEV_PROJECT_ID=your_dev_id
-> ```
->
-> Find project IDs in the URL: `https://us.posthog.com/project/<ID>/`
+Only call `switch-project` when needed (first query or user requests a change). Pass the project ID directly from the `projects-get` response.
 
 ## HogQL Query Patterns
 
-Use the plugin's query tool with HogQL for flexible analytics. Always add `LIMIT` to avoid huge payloads.
+Use the MCP's query tool with HogQL for flexible analytics. Always add `LIMIT` to avoid huge payloads.
 
 ### Page Views
 
@@ -221,42 +221,43 @@ Structured trend queries with breakdowns and multiple series.
 
 | Problem | Fix |
 |---|---|
-| Plugin not connected | Run `claude plugin install posthog` and complete OAuth |
-| Wrong project | Check which project ID env var is being used |
+| MCP not connected | Run `claude mcp add --transport http posthog https://mcp.posthog.com/mcp -s user` and restart |
+| OAuth expired | Restart Claude Code to trigger re-auth in the browser |
+| Wrong project | Call `projects-get` to list available projects, ask user or auto-infer from directory context |
 | Empty results | Widen date range, check event names with an event count query first |
 | Rate limited (429) | Wait and retry; limits are per-org (240/min analytics, 2400/hr queries) |
 
 ## Recommended Auto-Allow Settings
 
-Add these read-only PostHog plugin permissions to `~/.claude/settings.json` (global, applies to all projects). All tools below are strictly read-only — write operations (create, update, delete) are excluded and will still require manual approval.
+Add these read-only PostHog MCP permissions to `~/.claude/settings.json` (global, applies to all projects). All tools below are strictly read-only — write operations (create, update, delete) are excluded and will still require manual approval.
 
 ```json
-"mcp__plugin_posthog_posthog__query-run",
-"mcp__plugin_posthog_posthog__query-generate-hogql-from-question",
-"mcp__plugin_posthog_posthog__insight-get",
-"mcp__plugin_posthog_posthog__insight-query",
-"mcp__plugin_posthog_posthog__insights-get-all",
-"mcp__plugin_posthog_posthog__dashboard-get",
-"mcp__plugin_posthog_posthog__dashboards-get-all",
-"mcp__plugin_posthog_posthog__feature-flag-get-all",
-"mcp__plugin_posthog_posthog__feature-flag-get-definition",
-"mcp__plugin_posthog_posthog__experiment-get",
-"mcp__plugin_posthog_posthog__experiment-get-all",
-"mcp__plugin_posthog_posthog__experiment-results-get",
-"mcp__plugin_posthog_posthog__error-details",
-"mcp__plugin_posthog_posthog__list-errors",
-"mcp__plugin_posthog_posthog__docs-search",
-"mcp__plugin_posthog_posthog__organization-details-get",
-"mcp__plugin_posthog_posthog__organizations-get",
-"mcp__plugin_posthog_posthog__projects-get",
-"mcp__plugin_posthog_posthog__survey-get",
-"mcp__plugin_posthog_posthog__surveys-get-all",
-"mcp__plugin_posthog_posthog__surveys-global-stats",
-"mcp__plugin_posthog_posthog__survey-stats",
-"mcp__plugin_posthog_posthog__logs-query",
-"mcp__plugin_posthog_posthog__logs-list-attributes",
-"mcp__plugin_posthog_posthog__logs-list-attribute-values",
-"mcp__plugin_posthog_posthog__entity-search"
+"mcp__posthog__query-run",
+"mcp__posthog__query-generate-hogql-from-question",
+"mcp__posthog__insight-get",
+"mcp__posthog__insight-query",
+"mcp__posthog__insights-get-all",
+"mcp__posthog__dashboard-get",
+"mcp__posthog__dashboards-get-all",
+"mcp__posthog__feature-flag-get-all",
+"mcp__posthog__feature-flag-get-definition",
+"mcp__posthog__experiment-get",
+"mcp__posthog__experiment-get-all",
+"mcp__posthog__experiment-results-get",
+"mcp__posthog__error-details",
+"mcp__posthog__list-errors",
+"mcp__posthog__docs-search",
+"mcp__posthog__organization-details-get",
+"mcp__posthog__organizations-get",
+"mcp__posthog__projects-get",
+"mcp__posthog__survey-get",
+"mcp__posthog__surveys-get-all",
+"mcp__posthog__surveys-global-stats",
+"mcp__posthog__survey-stats",
+"mcp__posthog__logs-query",
+"mcp__posthog__logs-list-attributes",
+"mcp__posthog__logs-list-attribute-values",
+"mcp__posthog__entity-search"
 ```
 
 Add these to the `permissions.allow` array in settings.json.
